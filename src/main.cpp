@@ -5,6 +5,7 @@
 // Define the pins connected to the rotary dial
 #define PULSE_PIN 21    // Green wire
 #define DIAL_PIN 17     // White wire 
+#define HOOK_PIN 34     // Hook switch pin - Used to detect if phone is picked up
 
 // WiFi credentials
 const char* ssid = "YOUR_WIFI_SSID";
@@ -14,6 +15,7 @@ const char* password = "YOUR_WIFI_PASSWORD";
 const char* mqtt_server = "YOUR_MQTT_SERVER";
 const int mqtt_port = 1883;
 const char* mqtt_topic = "phone/dial";
+const char* mqtt_hook_topic = "phone/hook"; // New topic for hook switch events
 const char* mqtt_client_id = "phone";
 
 // Uncomment and set these if your broker requires authentication
@@ -29,6 +31,7 @@ bool dialActive = false;            // Flag for active dialing
 bool newPulseDetected = false;      // Flag for new pulse detection
 unsigned long lastReconnectAttempt = 0;  // Last connection
 bool mqttInitialized = false;            // Flag to track initialization
+int lastHookState = HIGH;           // Store last hook switch state
 
 // Initialize WiFi and MQTT clients
 WiFiClient espClient;               // Using standard WiFiClient (no SSL)
@@ -156,6 +159,29 @@ void publishNumber(int digit) {
   }
 }
 
+// Function to publish hook state to MQTT
+void publishHookState(bool isPickedUp) {
+  if (!mqttClient.connected()) {
+    Serial.println("Cannot publish: MQTT not connected");
+    return;
+  }
+  
+  const char* message = isPickedUp ? "hung_up" : "picked_up";
+  
+  Serial.print("Publishing hook state to MQTT topic ");
+  Serial.print(mqtt_hook_topic);
+  Serial.print(": ");
+  Serial.println(message);
+  
+  boolean success = mqttClient.publish(mqtt_hook_topic, message);
+  
+  if (success) {
+    Serial.println("Hook state published successfully");
+  } else {
+    Serial.println("Failed to publish hook state");
+  }
+}
+
 void setup() {
   // Initialize serial communication
   Serial.begin(115200);
@@ -166,6 +192,7 @@ void setup() {
   // Configure pins as inputs with pull-up resistors
   pinMode(PULSE_PIN, INPUT_PULLUP);
   pinMode(DIAL_PIN, INPUT_PULLUP);
+  pinMode(HOOK_PIN, INPUT_PULLUP);  // Set up hook switch pin
   
   Serial.println("\n\n==================================");
   Serial.println("Phone Dial - MQTT");
@@ -188,6 +215,7 @@ void setup() {
   reconnectMQTT();
   
   Serial.println("Dial a number to see the count and send via MQTT");
+  Serial.println("Hook switch monitoring active on pin 34");
 }
 
 void loop() {
@@ -211,6 +239,19 @@ void loop() {
   
   int pulseState = digitalRead(PULSE_PIN);
   int dialState = digitalRead(DIAL_PIN);
+  int hookState = digitalRead(HOOK_PIN);
+  
+  if (hookState != lastHookState) {
+    // If pin is LOW (connected to ground), phone is picked up
+    if (hookState == LOW) {
+      Serial.println("Phone picked up");
+      publishHookState(true);
+    } else {
+      Serial.println("Phone hung up");
+      publishHookState(false);
+    }
+    lastHookState = hookState;
+  }
   
   // When dial is pulled off-hook (LOW), start monitoring for pulses
   if (dialState == LOW && !dialActive) {
@@ -219,7 +260,7 @@ void loop() {
     Serial.println("Dial lifted, ready for number...");
   }
   
-    if (dialActive) {
+  if (dialActive) {
     // Detect falling edge of pulse (HIGH to LOW)
     if (pulseState == LOW && lastPulseState == HIGH) {
       pulseCount++;
