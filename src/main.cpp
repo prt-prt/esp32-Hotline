@@ -1,26 +1,12 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include "config.h"
 
 // Define the pins connected to the rotary dial
 #define PULSE_PIN 21    // Green wire
 #define DIAL_PIN 17     // White wire 
 #define HOOK_PIN 34     // Hook switch pin - Used to detect if phone is picked up
-
-// WiFi credentials
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
-
-// MQTT settings
-const char* mqtt_server = "YOUR_MQTT_SERVER";
-const int mqtt_port = 1883;
-const char* mqtt_topic = "phone/dial";
-const char* mqtt_hook_topic = "phone/hook"; // New topic for hook switch events
-const char* mqtt_client_id = "phone";
-
-// Uncomment and set these if your broker requires authentication
-// const char* mqtt_user = "your_username";
-// const char* mqtt_password = "your_password";
 
 // Variables
 int pulseCount = 0;                 // Counter for pulses
