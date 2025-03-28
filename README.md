@@ -1,37 +1,44 @@
-# Hello World for LOLIN S2 Mini
+# ESP32 Rotary Phone Interface
 
-This is a simple Hello World project for the LOLIN S2 Mini (ESP32-S2) board.
+A project that interfaces a vintage rotary phone with an ESP32-S2 microcontroller, converting rotary dial pulses into MQTT messages for modern IoT applications.
 
 ## Hardware Requirements
 
-- LOLIN S2 Mini (ESP32-S2 based) development board
-- USB cable
+- LOLIN S2 Mini (ESP32-S2) development board
+- Rotary phone with three connections:
+  - Pulse pin (Green wire)
+  - Dial pin (White wire)
+  - Hook switch pin
+- USB cable for programming
 
-## Software Setup
+## Features
 
-This project uses PlatformIO with the Arduino framework for development.
+- Converts rotary dial pulses to digital numbers
+- Detects phone on/off hook state
+- Publishes events via MQTT:
+  - `phone/dial`: Dialed numbers
+  - `phone/hook`: Phone state (picked up/hung up)
+  - `phone/status`: Connection status
+
+## Setup
 
 1. Install [PlatformIO](https://platformio.org/install)
 2. Clone this repository
-3. Open the project in PlatformIO
-4. Build and upload to your LOLIN S2 Mini
+3. Configure WiFi and MQTT settings in `src/main.cpp`
+4. Connect the rotary phone wires to the ESP32:
+   - Pulse pin → GPIO 21
+   - Dial pin → GPIO 17
+   - Hook switch → GPIO 34
+5. Build and upload using PlatformIO
 
-## How It Works
-
-This simple project:
-1. Initializes the serial communication at 115200 baud
-2. Sends a welcome message: "Hello World from LOLIN S2 Mini!"
-3. Continuously prints "Hello World!" every second
-
-## Serial Monitor Configuration
+## Serial Monitor
 
 - Baud rate: 115200
 - Data bits: 8
 - Parity: None
 - Stop bits: 1
 
-## Troubleshooting
+## Dependencies
 
-- If nothing appears in the serial monitor, check your connections and make sure the board is properly connected.
-- If you see "Device not configured" errors, try pressing the reset button on your board.
-- Try a different USB cable if you're experiencing connection issues. 
+- PubSubClient (MQTT client)
+- ESP32Ping (Network utilities) 
