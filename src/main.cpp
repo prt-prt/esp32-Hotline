@@ -7,6 +7,7 @@
 #define PULSE_PIN 21    // Green wire
 #define DIAL_PIN 17     // White wire 
 #define HOOK_PIN 34     // Hook switch pin - Used to detect if phone is picked up
+#define LED_PIN 15      // Onboard LED pin
 
 // Variables
 int pulseCount = 0;                 // Counter for pulses
@@ -29,12 +30,14 @@ void connectToWiFi() {
   
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    digitalWrite(LED_PIN, !digitalRead(LED_PIN)); // Toggle LED while connecting
     delay(500);
     Serial.print(".");
     attempts++;
   }
   
   if (WiFi.status() == WL_CONNECTED) {
+    digitalWrite(LED_PIN, HIGH); // Keep LED on when connected
     Serial.println("");
     Serial.println("WiFi connected");
     Serial.print("IP address: ");
@@ -46,6 +49,7 @@ void connectToWiFi() {
     Serial.print("DNS: ");
     Serial.println(WiFi.dnsIP());
   } else {
+    digitalWrite(LED_PIN, LOW); // Turn LED off if connection failed
     Serial.println("");
     Serial.println("WiFi connection failed. Check credentials and router.");
   }
@@ -179,6 +183,10 @@ void setup() {
   pinMode(PULSE_PIN, INPUT_PULLUP);
   pinMode(DIAL_PIN, INPUT_PULLUP);
   pinMode(HOOK_PIN, INPUT_PULLUP);  // Set up hook switch pin
+  pinMode(LED_PIN, OUTPUT);         // Set up LED pin as output
+  
+  // Initialize LED state
+  digitalWrite(LED_PIN, LOW);
   
   Serial.println("\n\n==================================");
   Serial.println("Phone Dial - MQTT");
