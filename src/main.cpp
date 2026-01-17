@@ -24,8 +24,23 @@ int lastHookState = HIGH;           // Store last hook switch state
 WiFiClient espClient;               // Using standard WiFiClient (no SSL)
 PubSubClient mqttClient(espClient);
 
+// Debug logging function that only prints in MQTT mode
+void debugLog(const char* message) {
+  #ifndef SERIAL_MODE
+  Serial.println(message);
+  #endif
+}
+
+void debugLog(const char* prefix, int value) {
+  #ifndef SERIAL_MODE
+  Serial.print(prefix);
+  Serial.println(value);
+  #endif
+}
+
 void connectToWiFi() {
-  Serial.println("Connecting to WiFi...");
+  #ifndef SERIAL_MODE
+  debugLog("Connecting to WiFi...");
   WiFi.begin(ssid, password);
   
   int attempts = 0;
@@ -39,20 +54,17 @@ void connectToWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
     digitalWrite(LED_PIN, HIGH); // Keep LED on when connected
     Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("Gateway: ");
-    Serial.println(WiFi.gatewayIP());
-    Serial.print("Subnet mask: ");
-    Serial.println(WiFi.subnetMask());
-    Serial.print("DNS: ");
-    Serial.println(WiFi.dnsIP());
+    debugLog("WiFi connected");
+    debugLog("IP address: ", WiFi.localIP());
+    debugLog("Gateway: ", WiFi.gatewayIP());
+    debugLog("Subnet mask: ", WiFi.subnetMask());
+    debugLog("DNS: ", WiFi.dnsIP());
   } else {
     digitalWrite(LED_PIN, LOW); // Turn LED off if connection failed
     Serial.println("");
-    Serial.println("WiFi connection failed. Check credentials and router.");
+    debugLog("WiFi connection failed. Check credentials and router.");
   }
+  #endif
 }
 
 boolean reconnectMQTT() {
@@ -125,51 +137,65 @@ boolean reconnectMQTT() {
   }
 }
 
-// Function to publish a number to MQTT
+// Function to publish a number
 void publishNumber(int digit) {
+  #ifdef SERIAL_MODE
+  // In Serial mode, send the number as a JSON-like format
+  Serial.print("{\"type\":\"dial\",\"digit\":");
+  Serial.print(digit);
+  Serial.println("}");
+  #else
   if (!mqttClient.connected()) {
-    Serial.println("Cannot publish: MQTT not connected");
+    debugLog("Cannot publish: MQTT not connected");
     return;
   }
   
   char message[10];
   sprintf(message, "%d", digit);
   
-  Serial.print("Publishing number to MQTT topic ");
-  Serial.print(mqtt_topic);
-  Serial.print(": ");
-  Serial.println(message);
+  debugLog("Publishing number to MQTT topic ");
+  debugLog(mqtt_topic);
+  debugLog(": ");
+  debugLog(message);
   
   boolean success = mqttClient.publish(mqtt_topic, message);
   
   if (success) {
-    Serial.println("Message published successfully");
+    debugLog("Message published successfully");
   } else {
-    Serial.println("Failed to publish message");
+    debugLog("Failed to publish message");
   }
+  #endif
 }
 
-// Function to publish hook state to MQTT
+// Function to publish hook state
 void publishHookState(bool isPickedUp) {
+  #ifdef SERIAL_MODE
+  // In Serial mode, send the hook state as a JSON-like format
+  Serial.print("{\"type\":\"hook\",\"state\":\"");
+  Serial.print(isPickedUp ? "picked_up" : "hung_up");
+  Serial.println("\"}");
+  #else
   if (!mqttClient.connected()) {
-    Serial.println("Cannot publish: MQTT not connected");
+    debugLog("Cannot publish: MQTT not connected");
     return;
   }
   
   const char* message = isPickedUp ? "hung_up" : "picked_up";
   
-  Serial.print("Publishing hook state to MQTT topic ");
-  Serial.print(mqtt_hook_topic);
-  Serial.print(": ");
-  Serial.println(message);
+  debugLog("Publishing hook state to MQTT topic ");
+  debugLog(mqtt_hook_topic);
+  debugLog(": ");
+  debugLog(message);
   
   boolean success = mqttClient.publish(mqtt_hook_topic, message);
   
   if (success) {
-    Serial.println("Hook state published successfully");
+    debugLog("Hook state published successfully");
   } else {
-    Serial.println("Failed to publish hook state");
+    debugLog("Failed to publish hook state");
   }
+  #endif
 }
 
 void setup() {
@@ -188,17 +214,20 @@ void setup() {
   // Initialize LED state
   digitalWrite(LED_PIN, LOW);
   
-  Serial.println("\n\n==================================");
-  Serial.println("Phone Dial - MQTT");
-  Serial.println("==================================");
-  Serial.print("Compiled on: ");
-  Serial.print(__DATE__);
-  Serial.print(" at ");
-  Serial.println(__TIME__);
+  #ifndef SERIAL_MODE
+  debugLog("\n\n==================================");
+  debugLog("Phone Dial - MQTT Mode");
+  debugLog("==================================");
+  debugLog("Compiled on: ");
+  debugLog(__DATE__);
+  debugLog(" at ");
+  debugLog(__TIME__);
+  #endif
   
   // Seed the random number generator
   randomSeed(micros());
   
+  #ifndef SERIAL_MODE
   // Connect to WiFi
   connectToWiFi();
   
@@ -208,13 +237,15 @@ void setup() {
   // Try to connect to MQTT immediately
   reconnectMQTT();
   
-  Serial.println("Dial a number to see the count and send via MQTT");
-  Serial.println("Hook switch monitoring active on pin 34");
+  debugLog("Dial a number to see the count and send via MQTT");
+  debugLog("Hook switch monitoring active on pin 34");
+  #endif
 }
 
 void loop() {
+  #ifndef SERIAL_MODE
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi connection lost, reconnecting...");
+    debugLog("WiFi connection lost, reconnecting...");
     connectToWiFi();
   }
   
@@ -230,6 +261,7 @@ void loop() {
   } else {
     mqttClient.loop();
   }
+  #endif
   
   int pulseState = digitalRead(PULSE_PIN);
   int dialState = digitalRead(DIAL_PIN);
@@ -238,10 +270,10 @@ void loop() {
   if (hookState != lastHookState) {
     // If pin is LOW (connected to ground), phone is picked up
     if (hookState == LOW) {
-      Serial.println("Phone picked up");
+      debugLog("Phone picked up");
       publishHookState(true);
     } else {
-      Serial.println("Phone hung up");
+      debugLog("Phone hung up");
       publishHookState(false);
     }
     lastHookState = hookState;
@@ -251,7 +283,7 @@ void loop() {
   if (dialState == LOW && !dialActive) {
     dialActive = true;
     pulseCount = 0;
-    Serial.println("Dial lifted, ready for number...");
+    debugLog("Dial lifted, ready for number...");
   }
   
   if (dialActive) {
@@ -261,8 +293,7 @@ void loop() {
       lastPulseTime = millis();
       newPulseDetected = true;
       
-      Serial.print("Pulse detected: ");
-      Serial.println(pulseCount);
+      debugLog("Pulse detected: ", pulseCount);
     }
   }
   
@@ -271,14 +302,14 @@ void loop() {
     int digit = (pulseCount == 10) ? 0 : pulseCount;
     
     if (pulseCount >= 1 && pulseCount <= 10) {
-      Serial.println("\n*************************");
-      Serial.print("NUMBER DIALED: ");
-      Serial.println(digit);
-      Serial.println("*************************\n");
+      #ifndef SERIAL_MODE
+      debugLog("\n*************************");
+      debugLog("NUMBER DIALED: ", digit);
+      debugLog("*************************\n");
+      #endif
       publishNumber(digit);
     } else if (pulseCount > 0) {
-      Serial.print("Invalid pulse count: ");
-      Serial.println(pulseCount);
+      debugLog("Invalid pulse count: ", pulseCount);
     }
     
     // Reset for next number
